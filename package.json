@@ -1,0 +1,23 @@
+{
+  "name": "beagle",
+  "version": "1.0.0",
+  "description": "Beagle - experiment visualiser",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "static . -p 9999"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robertmackenzie/beagle.git"
+  },
+  "author": "Robert Mackenzie",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/robertmackenzie/beagle/issues"
+  },
+  "homepage": "https://github.com/robertmackenzie/beagle#readme",
+  "devDependencies": {
+    "node-static": "^0.7.9"
+  }
+}
