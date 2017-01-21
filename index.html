@@ -3,8 +3,200 @@
 <head>
   <meta charset="UTF-8">
   <title>Beagle - experiment visualiser</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.6/handlebars.min.js"></script>
 </head>
 <body>
+  <script id="summary-table-template" type="text/x-handlebars-template">
+    <table>
+      <thead>
+        <tr>
+          <td>variant</td>
+          <td>mean</td>
+          <td>standard deviation</td>
+          <td>min</td>
+          <td>max</td>
+          <td>standard error</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each variants}}
+        <tr>
+          <td>{{variant}}</td>
+          <td>{{mean}}</td>
+          <td>{{standardDeviation}}</td>
+          <td>{{min}}</td>
+          <td>{{max}}</td>
+          <td>{{stdErr}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    <p>Score: {{score}}</p>
+  </script>
+
   <h1>Beagle - experiment visualiser</h1>
+
+  <h2>Hypothesis</h2>
+
+  <article>
+    <p>µ = difference between means</p>
+    <p>H<sub>0</sub>: µ = 0</p>
+    <p>H<sub>1</sub>: µ > 0</p>
+    <p>⍺ = 0.05</p>
+    <p>β = 0.05</p>
+  </article>
+
+  <h2>Summary</h2>
+
+  <div id="summary-table"></div>
+
+  <h2>Distribution of means</h2>
+
+  <div id="distribution-of-means"></div>
+
+  <script>
+    const control = [
+      10164, 4913, 2796, 2226, 2261, 3178, 7023, 13836, 24449, 39064, 48762,
+      53124, 54837, 57607, 53654, 53692, 57245, 51141, 51247, 52625, 51552,
+      40602, 29596, 16185, 9454, 4980, 2942, 2374, 2759, 3626, 7409, 15527,
+      25588, 42812, 44745, 50072, 47499, 50529, 47936, 46688, 51033, 46358,
+      49481, 54239, 51575, 41482, 29622, 15960, 9315, 5163, 3287, 2401, 2655,
+      3695, 8376, 14635, 25043, 38794, 44717, 29726, 48233, 49839, 49177, 48662,
+      52307, 47040, 48378, 53613, 53149, 43508, 32262, 16014, 8168, 4600, 2865,
+      2390, 2539, 3750, 7500, 15069, 24935, 37062, 49402, 46274, 50680, 58090,
+      58142, 53951, 51493, 43927, 45472, 49060, 45039, 38087, 27855, 15825,
+      9231, 4608, 3096, 2285, 2607, 3539, 7694, 14616, 24822, 40131, 45472,
+      48371, 48309, 48630, 48728, 47528, 48992, 45777, 43944, 44989, 40625,
+      33894, 25358, 15897, 8805, 4895, 5055, 2292, 1994, 2747, 4983, 10481,
+      20392, 34263, 40025, 48627, 53432, 52522, 43616, 42809, 42464, 43637,
+      38551, 37060, 33612, 29637, 23155, 15928 ];
+
+    const test = control.map(function(x) {
+      return x + 3300;
+    });
+
+    const sum = function(vector) {
+      return vector.reduce(function(a, b) {
+          return a + b;
+      }, 0);
+    };
+
+    const mean = function(vector) {
+      return sum(vector)/vector.length;
+    };
+
+    const variance = function(vector) {
+      const  populationMean = mean(vector);
+
+      const summedSquaredDeviationFromMean = vector.reduce(function(a, b) {
+        return a + Math.pow(b - populationMean, 2);
+      }, 0);
+
+      return summedSquaredDeviationFromMean / vector.length;
+    };
+
+    const normalDensity = function(x, mean, variance) {
+      return 1 / Math.sqrt(2 * variance * Math.PI) * Math.pow(Math.E, -(Math.pow((x - mean), 2) / (2 * variance)));
+    };
+
+    const normalTrace = function(mean, variance, n) {
+      const steps = n || 50;
+
+      const stdDev = Math.sqrt(variance);
+
+      const range = [mean - (5 * stdDev), mean + (5 * stdDev)]
+
+      const step = (range[1] - range[0]) / steps;
+
+      const xs = [];
+      const ys = [];
+
+      for(let i = 0; i < steps; i++) {
+        let x = range[0] + (i * step);
+
+        xs.push(x);
+        ys.push(normalDensity(x, mean, variance));
+      }
+
+      return {
+        x: xs,
+        y: ys,
+        type: 'scatter',
+        line: {
+          shape: 'spline'
+        }
+      };
+    };
+
+    const stdDev = function(vector) {
+      return Math.sqrt(variance(vector));
+    };
+
+    const varianceOfMean = function(vector) {
+      return variance(vector) / vector.length;
+    };
+
+    const stdErrOfMean = function(vector) {
+      return Math.sqrt(varianceOfMean(vector));
+    };
+
+    const score = function(sampleMean, hypothesizedMean, stdErr) {
+      return (sampleMean - hypothesizedMean) / stdErr;
+    };
+
+    const controlTrace = normalTrace(mean(control), varianceOfMean(control));
+    controlTrace.name = "control";
+    const testTrace = normalTrace(mean(test), varianceOfMean(test));
+    testTrace.name = "test";
+    const testMeanTrace = {
+      name: 'test mean',
+      mode: 'lines',
+      line: {
+        color: 'black'
+      },
+      x: [mean(test), mean(test)],
+      y: [0, Math.max.apply(undefined, controlTrace.y, testTrace.y)]
+    };
+    const data = [controlTrace, testTrace, testMeanTrace];
+
+    const min = function(vector) {
+      return Math.min.apply(undefined, vector);
+    };
+
+    const max = function(vector) {
+      return Math.max.apply(undefined, vector);
+    };
+
+    const summary = function(name, vector) {
+      return {
+        variant: name,
+        mean: mean(vector),
+        standardDeviation: stdDev(vector),
+        min: min(vector),
+        max: max(vector),
+        stdErr: stdErrOfMean(vector)
+      };
+    };
+
+    document.addEventListener('DOMContentLoaded', function(){
+      const summaryTable = document.getElementById('summary-table');
+      const source = document.getElementById('summary-table-template');
+      const template = Handlebars.compile(source.innerHTML);
+
+      const experiment = {
+        variants: [summary('control', control), summary('test', test)],
+        //FIXME: last param should be pooled stdErrOfMean
+        score: score(Math.abs(mean(control) - mean(test)), 0, stdErrOfMean(control))
+      };
+
+      const summaryHTML = template(experiment);
+
+      summaryTable.insertAdjacentHTML('afterbegin', summaryHTML);
+
+      Plotly.newPlot('distribution-of-means', data);
+    });
+  </script>
+
 </body>
 </html>
